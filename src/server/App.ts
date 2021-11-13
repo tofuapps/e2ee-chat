@@ -57,9 +57,13 @@ export class App {
       };
 
       socket.on('message', async (message: string) => {
-        let json = JSON.parse(message);
-        console.log("< received " + json.kind);
-        this.handleExchangeBridge(json, client);
+        try {
+          let json = JSON.parse(message);
+          console.log("< received " + json.kind);
+          this.handleExchangeBridge(json, client);
+        } catch (e) {
+          console.error("message processing failure", e);
+        }
       });
 
       socket.on('close', async () => {

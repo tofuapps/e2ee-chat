@@ -223,7 +223,6 @@ export class CryptoOperations {
     const keyFormat = 'spki';
     const keyUsages: KeyUsage[] = [];
     const keyAlgorithm = { name: 'ECDH', namedCurve: 'P-256' };
-    console.log("aaaa", publicKey);
     const cryptoKey = await crypto.subtle.importKey(
       keyFormat,
       keyBytes,
@@ -231,7 +230,6 @@ export class CryptoOperations {
       true,
       keyUsages,
     );
-    console.log("bbbb");
     return cryptoKey;
   }
   static async importSigningPublicKeyFromBase64(publicKey: string): Promise<CryptoKey> {

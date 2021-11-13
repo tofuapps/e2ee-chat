@@ -165,6 +165,8 @@ export class Socket {
         if (replyToIndirect) this.notificationPendingHandlers[replyToIndirect]?.add(notificationHandler);
       }
 
+      log("Sending", data);
+
       //send data
       if (typeof data === "string") {
         this.ws.send(data);
@@ -184,6 +186,7 @@ export class Socket {
 
   private async sendEncrypted(data: any, listenForReply?: boolean | string, altTargetInfo?: UserInfo): Promise<Notification | undefined> {
     if (!data) return;
+    log("Encrypting message:", data);
 
     if (!this.derivePublicKey || !this.derivePrivateKey) {
       throw new Error("No derivation key pair!");
