@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "target": "es2019",
+    "module": "commonjs",
+    "preserveConstEnums": true,
+    "strictNullChecks": true,
+    "strict": true,
+    "outDir": "dist",
+    "sourceMap": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "downlevelIteration": true,
+    "forceConsistentCasingInFileNames": true
+
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "src/server/public/**/*", "src/web/**/*", "**/*.spec.ts"]
+}
