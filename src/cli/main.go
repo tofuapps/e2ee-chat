@@ -48,7 +48,6 @@ func main() {
 
 			var data map[string]interface{}
 			_ = json.Unmarshal(message, &data)
-			log.Println(data)
 
 			switch data["kind"] {
 			case "nonce":
@@ -56,6 +55,13 @@ func main() {
 				fmt.Println("Enter nickname:")
 				fmt.Scanln(&nickname)
 				Register(nickname, data["value"].(string))
+			case "notification":
+				if data["replyTo"] == "registration" {
+					var targetPublicKey string
+					fmt.Println("Enter target:")
+					fmt.Scanln(&targetPublicKey)
+					InitiateKeyExchange(targetPublicKey)
+				}
 			}
 		}
 	}()
