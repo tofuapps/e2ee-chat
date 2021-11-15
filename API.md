@@ -1,5 +1,18 @@
 # e2ee-chat api
-Description of how the current API works, I guess
+Description + How to use
+
+## Overview
+
+The flow for establishing a connection and communicating between client is as follows:
+1. Generate a signing key pair using the RSA Algorithm
+2. Register (nickname, signing public key) with the server
+3. Identify a target by its signing public key
+4. Generate a ephemeral key pair for ECDH
+5. Perform a key exchange (ECDH) with the target
+6. Derive an AES-256 key
+7. Encrypt all messages using the derived key and a randomly generated nonce
+
+More details are found in the sections below.
 
 ## Registration
 1. Connect to websocket at path `/ws`.
@@ -28,6 +41,8 @@ Description of how the current API works, I guess
 - An acknowledgement notification should be signed and encrypted if a communication is already established.
 
 ## Algorithms Used
+All keys are transmitted in DER-encoded PKIX format encoded with base64.
+
 ### Sign and Verify
 ```
 RSASSA-PKCS1-v1_5
@@ -44,12 +59,17 @@ i.e. SHA256 hash of string of JSON object in compact form (no spaces, newlines o
 ECDH
 curve = P-256
 ```
+Note that the secret used by the JS code is currently NOT hashed with SHA256, i.e. it is the raw output of ECDH. 
+
 ### Encrypt and Decrypt
 (with derived secret key)
 ```
 AES-GCM,
 length = 256
 ```
+
+(A randomly generated 12-byte nonce should be used.)
+Note that the nonce and ciphertext should be transmitted in base64 encoded format as well.
 
 ## Object details
 For details of object specifications, refer to [types.ts](src/shared/types.ts)
