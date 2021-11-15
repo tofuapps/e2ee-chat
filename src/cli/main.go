@@ -36,6 +36,10 @@ func main() {
 
 	done := make(chan struct{})
 
+	var hehe string
+	fmt.Println("initiator? [Y/N]")
+	fmt.Scanln(&hehe)
+
 	go func() {
 		defer close(done)
 		for {
@@ -56,12 +60,20 @@ func main() {
 				fmt.Scanln(&nickname)
 				Register(nickname, data["value"].(string))
 			case "notification":
-				if data["replyTo"] == "registration" {
-					var targetPublicKey string
-					fmt.Println("Enter target:")
-					fmt.Scanln(&targetPublicKey)
-					InitiateKeyExchange(targetPublicKey)
+				switch data["replyTo"] {
+				case "registration":
+					if hehe == "Y" {
+						var targetPublicKey string
+						fmt.Println("Enter target:")
+						fmt.Scanln(&targetPublicKey)
+						PrepareForKeyExchange()
+						PerformKeyExchange(targetPublicKey)
+					}
 				}
+			case "keyExchange":
+				HandleKeyExchange(data["info"].(map[string]interface{}))
+			case "e2eeMessage":
+				log.Println("decrypted", Decrypt(data))
 			}
 		}
 	}()
