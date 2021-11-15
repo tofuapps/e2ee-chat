@@ -6,11 +6,13 @@
   "license": "MIT",
   "scripts": {
     "start": "node ./dist/server/index.js",
-    "debug": "yarn run nodemon ./dist/server/index.js",
-    "clean": "rimraf dist",
-    "build": "yarn build-web",
+    "build": "yarn build-web && yarn build-cli",
+    "clean": "rm -rf dist",
+    "debug-web": "yarn run nodemon ./dist/server/index.js",
+    "debug-cli": "cd src/cli && go run main.go api.go",
     "copy-web": "copyfiles -u 1 src/**/*.html src/**/*.css dist/",
-    "build-web": "tsc && webpack && yarn copy-web"
+    "build-web": "tsc && webpack && yarn copy-web",
+    "build-cli": "cd src/cli && go build -o ../../dist/cli/e2ee-chat"
   },
   "nodemonConfig": {
     "watch": [
@@ -26,7 +28,6 @@
     "@types/ws": "^8.2.0",
     "copyfiles": "^2.4.1",
     "nodemon": "^2.0.15",
-    "rimraf": "^3.0.2",
     "ts-loader": "^9.2.6",
     "typescript": "^4.4.4",
     "webpack": "^5.64.0",
