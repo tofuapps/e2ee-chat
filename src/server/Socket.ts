@@ -116,7 +116,7 @@ export class UserSocket {
 
   public sendNotification(replyTo: string, success: boolean, reason?: string) {
     let notification: NotificationReceipt = {
-      kind: 'response',
+      kind: "notification",
       replyTo: replyTo,
       success: success,
       reason: reason
