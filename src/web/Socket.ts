@@ -1,4 +1,4 @@
-import {EncryptedMessage, KeyExchangeMessage, Nonce, Notification, Registration, UserInfo, UserMessage} from "../shared/types";
+import {EncryptedMessage, KeyExchangeMessage, Nonce, NotificationReceipt, Registration, UserInfo, UserMessage} from "../shared/types";
 import {log, uuidv4} from "../shared/utils";
 import {CryptoOperations} from "./operations";
 
@@ -8,7 +8,7 @@ export class Socket {
   private nickname: string | undefined;
   private registered: boolean = false;
 
-  private notificationPendingHandlers: { [key: string]: Set<(e: Notification) => void> } = {};
+  private notificationPendingHandlers: { [key: string]: Set<(e: NotificationReceipt) => void> } = {};
 
   readonly signingPublicKey: CryptoKey;
   readonly signingPrivateKey: CryptoKey;
@@ -76,8 +76,8 @@ export class Socket {
     if (json.kind === "nonce" && json.value) {
       this.nonce = json as Nonce;
     } else if (json.kind === "notification") {
-      let notification = json as Notification;
-      await this.handleNotification(notification);
+      let receipt = json as NotificationReceipt;
+      await this.handleNotification(receipt);
     } else if (json.kind === "keyExchange") {
       let keyExchange = json as KeyExchangeMessage;
       await this.handleKeyExchange(keyExchange);
@@ -119,7 +119,7 @@ export class Socket {
   //
   // MARK: Outgoing Message Internal Dispatch Helper
   //
-  private async send(data: any, listenForReply?: boolean | string): Promise<Notification | undefined> {
+  private async send(data: any, listenForReply?: boolean | string): Promise<NotificationReceipt | undefined> {
     return new Promise((resolve, reject) => {
       if (!this.ws) {
         reject(new Error("Not connected to server!"));
@@ -130,7 +130,7 @@ export class Socket {
         let halted = false;
         let replyToDirect = data.kind;
         let replyToIndirect = (typeof listenForReply === "string") ? listenForReply : undefined;
-        let notificationHandler: ((notification: Notification) => void) | undefined;
+        let notificationHandler: ((notification: NotificationReceipt) => void) | undefined;
         let clear = () => {
           halted = true;
           if (notificationHandler) {
@@ -145,7 +145,7 @@ export class Socket {
           reject("Request timed out, no reply received for " + (replyToIndirect || replyToDirect));
         }, 3000);
 
-        notificationHandler = (notification: Notification) => {
+        notificationHandler = (notification: NotificationReceipt) => {
           if (halted) {
             return;
           }
@@ -184,7 +184,7 @@ export class Socket {
     });
   }
 
-  private async sendEncrypted(data: any, listenForReply?: boolean | string, altTargetInfo?: UserInfo): Promise<Notification | undefined> {
+  private async sendEncrypted(data: any, listenForReply?: boolean | string, altTargetInfo?: UserInfo): Promise<NotificationReceipt | undefined> {
     if (!data) return;
     log("Encrypting message:", data);
 
@@ -222,21 +222,22 @@ export class Socket {
     return await this.send(encrypted, kind);
   }
 
-  private async sendNotification(replyTo: string, success: boolean, reason?: string, uuid?: string, altTargetInfo?: UserInfo) {
-    let notification: Notification = {
+  private async sendMessageResponse(replyTo: string, success: boolean, reason?: string, uuid?: string, altTargetInfo?: UserInfo) {
+    let resp: NotificationReceipt = {
       kind: 'notification',
       replyTo,
       success,
       uuid,
       reason
     }
-    await this.sendEncrypted(notification, false, altTargetInfo);
+    resp = await CryptoOperations.sign(resp, this.signingPrivateKey);
+    await this.sendEncrypted(resp, false, altTargetInfo);
   }
 
   //
   // MARK: Incoming Message Internal Handlers
   //
-  private async handleNotification(notification: Notification) {
+  private async handleNotification(notification: NotificationReceipt) {
     let handlers = this.notificationPendingHandlers[notification.replyTo || ''];
     if (handlers) {
       handlers.forEach((handler) => {
@@ -247,11 +248,15 @@ export class Socket {
     this.newNotificationListener?.(notification);
   }
 
+  private initiatedExchange = false;
+  public shouldReturnExchange(): boolean {
+    return !this.initiatedExchange && !this.targetUserInfo;
+  }
   private async handleKeyExchange(keyExchange: KeyExchangeMessage) {
     log("key exchange: received from target");
 
     if (this.targetUserInfo && keyExchange.info.signingPublicKey !== this.targetUserInfo.signingPublicKey) {
-      this.sendNotification(keyExchange.kind, false, "Unable to connect due to an already existing connection.", undefined, keyExchange.info);
+      this.sendMessageResponse(keyExchange.kind, false, "Unable to connect due to an already existing connection.", undefined, keyExchange.info);
       return;
     }
     if (!keyExchange.info.signingPublicKey || !keyExchange.info.derivePublicKey) {
@@ -261,20 +266,16 @@ export class Socket {
       throw new Error("Error: Received key exchange message with invalid signature!");
     }
 
-    let shouldReturnExchange = false;
-    if (this.targetUserInfo === undefined) {
-      shouldReturnExchange = true;
-    }
+    let shouldReturnExchange = this.shouldReturnExchange();
 
     this.targetUserInfo = keyExchange.info;
     this.targetSigningPublicKey = await CryptoOperations.importSigningPublicKeyFromBase64(keyExchange.info.signingPublicKey);
     this.targetDerivePublicKey = await CryptoOperations.importDerivePublicKeyFromBase64(keyExchange.info.derivePublicKey);
 
-    this.sendNotification(keyExchange.kind, true);
-
     if (shouldReturnExchange) {
-      this.sendKeyExchange();
+      await this.sendKeyExchange();
     }
+    this.sendMessageResponse(keyExchange.kind, true);
 
     this.newKeyExchangeListener?.(keyExchange);
   }
@@ -284,14 +285,14 @@ export class Socket {
       throw new Error("Error: Received message with invalid signature!");
     }
 
-    if (Math.abs(message.timestamp - Date.now()) > 1000 * 60 * 5) {
+    if (Math.abs(message.timestamp*1000 - Date.now()) > 1000 * 60 * 5) {
       throw new Error("Error: Received message with invalid timestamp (deviation of more than 5 minutes)!");
     }
 
     //TODO: Process and cache data here
 
     try {
-      this.sendNotification(message.kind, true, undefined, message.uuid);
+      this.sendMessageResponse(message.kind, true, undefined, message.uuid);
     } catch (e) {
       log("Error:", e);
     }
@@ -369,7 +370,7 @@ export class Socket {
   //
   public newIncomingMessageListener: ((message: UserMessage) => void) | undefined;
   public newOutgoingMessageListener: ((message: UserMessage) => void) | undefined;
-  public newNotificationListener: ((notification: Notification) => void) | undefined;
+  public newNotificationListener: ((notification: NotificationReceipt) => void) | undefined;
   public newKeyExchangeListener: ((keyExchange: KeyExchangeMessage) => void) | undefined;
 
   //
@@ -413,18 +414,28 @@ export class Socket {
     };
 
     log("key exchange: sending to target");
+
+    this.initiatedExchange = true;
     let result = await this.send(keyExchangeMessage);
+    this.initiatedExchange = false;
+
     if (!result?.success) {
       throw new Error("Key exchange failed: " + result?.reason);
+    } else if (result?.success && await CryptoOperations.verify(result, this.targetSigningPublicKey)) {
+      log("key exchange: target received exchange, acknowledgement verified");
+    } else {
+      log("key exchange: target received exchange, but acknowledgement is unsigned");
+      // for now taking it to be ok since notifications between clients are end-to-end encrypted
     }
   }
+
 
   public async sendMessage(msg: string) {
     let message: UserMessage = {
       kind: "message",
       uuid: uuidv4(),
       message: msg,
-      timestamp: Date.now(),
+      timestamp: Date.now()/1000,
     };
     message = await CryptoOperations.sign(message, this.signingPrivateKey);
 

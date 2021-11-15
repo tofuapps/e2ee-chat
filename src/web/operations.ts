@@ -36,7 +36,7 @@ export class CryptoOperations {
     );
   }
   static async deriveSecretKey(privateKey: CryptoKey, publicKey: CryptoKey): Promise<CryptoKey> {
-    return crypto.subtle.deriveKey(
+    let key = await crypto.subtle.deriveKey(
       {
         name: "ECDH",
         public: publicKey
@@ -49,6 +49,19 @@ export class CryptoOperations {
       true,
       ["encrypt", "decrypt"]
     );
+    let raw = await crypto.subtle.exportKey('raw', key);
+    let hash = await crypto.subtle.digest('SHA-256', raw);
+    key = await crypto.subtle.importKey(
+      'raw',
+      hash,
+      {
+        name: "AES-GCM",
+        length: 256
+      },
+      true,
+      ["encrypt", "decrypt"]
+    );
+    return key;
   }
   static async hashPublicKey(publicKey: string | CryptoKey): Promise<string> {
     let key;

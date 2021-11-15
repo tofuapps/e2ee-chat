@@ -1,4 +1,4 @@
-interface Notification {
+interface NotificationReceipt {
   kind: "notification";
   replyTo: string;
   success: boolean;
@@ -51,7 +51,7 @@ interface EncryptedMessage {
 }
 
 export {
-  Notification,
+  NotificationReceipt,
   Nonce,
   Registration,
   UserMessage,

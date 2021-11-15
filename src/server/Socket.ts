@@ -1,5 +1,5 @@
 import { WebSocket, Server } from 'ws';
-import { Nonce, Notification, Registration, UserInfo } from '../shared/types';
+import { Nonce, NotificationReceipt, Registration, UserInfo } from '../shared/types';
 import * as crypto from 'crypto';
 import { CryptoOperations } from './operations';
 
@@ -63,33 +63,37 @@ export class UserSocket {
       }
       this.socket.send(JSON.stringify(nonce));
       this.socket.once('message', async (message: string) => {
-        const response = JSON.parse(message) as Partial<Registration>;
-        if (response.kind === 'registration' && response.nonce === nonce.value) {
-          let nickname = response.nickname;
-          let signature = response.signature;
-          let publicKey = response.signingPublicKey;
 
-          if (!(nickname && signature && publicKey)) {
-            reject(Error('Invalid registration response'));
-            return;
+        try {
+          const response = JSON.parse(message) as Partial<Registration>;
+          if (response.kind === 'registration' && response.nonce === nonce.value) {
+            let nickname = response.nickname;
+            let signature = response.signature;
+            let publicKey = response.signingPublicKey;
+
+            if (!(nickname && signature && publicKey)) {
+              throw new Error('Invalid registration response');
+            }
+
+            let verification = CryptoOperations.verifyRegistration(response as Registration, nonce, publicKey);
+            if (!verification) {
+              throw new Error('Invalid registration response');
+            }
+
+            let publicKeySHA256 = await CryptoOperations.hashPublicKey(publicKey)
+
+            this.nickname = nickname;
+            this.publicKey = publicKey;
+            this.publicKeySHA256 = publicKeySHA256;
+
+            resolve();
+          } else {
+            throw new Error('Invalid registration response');
           }
-
-          let verification = CryptoOperations.verifyRegistration(response as Registration, nonce, publicKey);
-          if (!verification) {
-            reject(Error('Invalid registration response'));
-            return;
-          }
-
-          let publicKeySHA256 = await CryptoOperations.hashPublicKey(publicKey)
-
-          this.nickname = nickname;
-          this.publicKey = publicKey;
-          this.publicKeySHA256 = publicKeySHA256;
-
-          resolve();
-        } else {
-          reject(Error('Invalid registration response'));
+        } catch (e) {
+          reject(e);
         }
+
       });
     });
   }
@@ -111,8 +115,8 @@ export class UserSocket {
   }
 
   public sendNotification(replyTo: string, success: boolean, reason?: string) {
-    let notification: Notification = {
-      kind: 'notification',
+    let notification: NotificationReceipt = {
+      kind: 'response',
       replyTo: replyTo,
       success: success,
       reason: reason

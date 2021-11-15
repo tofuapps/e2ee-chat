@@ -10,7 +10,7 @@ import { Socket } from "./Socket";
     let e = document.getElementById("chat-log") as HTMLUListElement | undefined;
     if (e) {
       let li = document.createElement("li");
-      let time = new Date(message?.timestamp);
+      let time = new Date((message?.timestamp || 0) * 1000);
       let timeStr = time.toLocaleTimeString();
       li.innerText = `[${timeStr}] ${getNickname()}: ${message?.message}`;
       e.appendChild(li);
@@ -21,7 +21,7 @@ import { Socket } from "./Socket";
     let e = document.getElementById("chat-log") as HTMLUListElement | undefined;
     if (e) {
       let li = document.createElement("li");
-      let time = new Date(message?.timestamp);
+      let time = new Date((message?.timestamp || 0) * 1000);
       let timeStr = time.toLocaleTimeString();
       li.innerText = `[${timeStr}] ${nickname}: ${message?.message}`;
       e.appendChild(li);
